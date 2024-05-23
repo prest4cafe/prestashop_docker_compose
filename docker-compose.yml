@@ -1,0 +1,95 @@
+version: "3.9"
+services:
+ mariadb-distribnineart:
+   container_name: mariadb-distribnineart
+   image: mariadb
+   restart: always
+   networks:
+     - web
+   volumes:
+     - db_data-distribnineart:/var/lib/mysql
+   environment:
+     - MYSQL_ROOT_PASSWORD=Gowc8hXKgpl7
+ traefik-distribnineart:
+   container_name: traefik-distribnineart
+   image: traefik:latest
+   restart: always
+   command:
+     - "--api.insecure=true"
+     - "--providers.docker"
+     - "--providers.docker.exposedByDefault=false"
+     - "--entrypoints.web.address=:80"
+     - "--entrypoints.websecure.address=:443"
+     - "--accesslog=true"
+     - "--accesslog.filepath=/logs/access.log"
+   ports:
+     - "80:80"
+     - "443:443"
+     - "8080:8080"
+   volumes:
+     - "/var/run/docker.sock:/var/run/docker.sock"
+     - "./letsencrypt:/letsencrypt"
+     - "/home/distribnineart/logs/:/logs/"
+     - "/home/distribnineart/traefik.yml:/etc/traefik/traefik.yml:ro" # Set the static configuration
+   networks:
+     - web
+   labels:
+     - "traefik.enable=true"
+     - 'traefik.http.routers.monitor-distribnineart.rule=Host("monitor.distribnineart.codemyshop.fr")'
+     - "traefik.http.routers.monitor-distribnineart.service=api@internal"
+     - "traefik.port=8080"
+ prestashop-distribnineart:
+   container_name: prestashop-distribnineart
+   image: prestashop/prestashop:latest
+   restart: always
+   labels:
+     - "traefik.enable=true"
+     - "traefik.http.routers.prestashop-distribnineart.rule=Host(\"distribnineart.codemyshop.fr\")"
+     - "traefik.http.routers.prestashop-distribnineart.entrypoints=websecure"
+     - "traefik.http.routers.prestashop-distribnineart.tls.certresolver=zerossl"
+   networks:
+     - web
+   links:
+     - mariadb-distribnineart:mariadb-distribnineart
+   depends_on:
+     - mariadb-distribnineart
+   volumes:
+     - /home/distribnineart/prestashop:/var/www/html
+     - /home/distribnineart/php.ini:/usr/local/etc/php/conf.d/custom.ini
+     - /home/distribnineart/logs/php_errors.log:/var/logs/apache2/errors.log
+   environment:
+     - DB_SERVER=mariadb-distribnineart
+     - DB_USER=root
+     - DB_PASSWD=Gowc8hXKgpl7
+     - DB_NAME=distribnineart
+     - PS_DEV_MODE=0
+     - PS_INSTALL_AUTO=1
+     - PS_INSTALL_DB=1
+     - PS_DOMAIN=distribnineart.codemyshop.fr
+     - PS_ENABLE_SSL=1
+     - PS_FOLDER_INSTALL=install_prestashop
+     - PS_FOLDER_ADMIN=admin_prestashop
+     - ADMIN_PASSWD=zndy4Y5BbQLk
+     - ADMIN_MAIL=alexandre@baba-agency.com
+     - PS_LANGUAGE=fr
+     - PS_COUNTRY=FR
+     - PS_ERASE_DB=1
+     - PS_DEMO_MODE=0
+ adminer-distribnineart:
+   container_name: adminer-distribnineart
+   image: adminer
+   restart: always
+   networks:
+     - web
+   labels:
+     - "traefik.enable=true"
+     - 'traefik.http.routers.adminer-distribnineart.rule=PathPrefix("/distribnineart-HbdgsFIsh423-adm")'
+     - "traefik.http.routers.adminer-distribnineart.entrypoints=websecure"
+     - "traefik.http.routers.adminer-distribnineart.tls.certresolver=zerossl"
+     - "traefik.http.routers.adminer-distribnineart.middlewares=dbauth-adminer-distribnineart"
+     - "traefik.http.middlewares.dbauth-adminer-distribnineart.basicauth.users=alexandre@baba-agency.com:4887782y48877805488778xiAkWey/Wv684bQMMxts.ei.FByOeM3lyNU89ivde8uf9m3iNPCZO"
+networks:
+ web:
+   external: true
+volumes:
+ db_data-distribnineart:
